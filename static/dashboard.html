@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Billboard dashboard</title>
+<style>
+  :root { --bg:#0f1115; --panel:#181b22; --line:#262a33; --text:#e6e8ee; --muted:#8a90a0; --accent:#4f8cff;
+          --ok:#2ecc71; --bad:#ff5a5f; --warn:#f5b041; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif; }
+  header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line);
+           background:var(--panel); position:sticky; top:0; z-index:5; }
+  header h1 { font-size:16px; margin:0 16px 0 0; }
+  .pill { padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; }
+  .pill.on { background:#153d2a; color:var(--ok);} .pill.off { background:#3a1d1f; color:var(--bad);}
+  button { background:#232835; color:var(--text); border:1px solid var(--line); padding:6px 12px; border-radius:6px; cursor:pointer; font:inherit; }
+  button:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.danger { color:var(--bad); }
+  button.small { padding:2px 8px; font-size:12px; }
+  main { padding:16px; display:grid; gap:16px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; min-width:0; }
+  section.wide { grid-column: 1 / -1; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 10px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:middle; white-space:nowrap; }
+  th { color:var(--muted); font-weight:600; font-size:12px; }
+  td.num, th.num { text-align:right; font-variant-numeric: tabular-nums; }
+  .kpis { display:grid; grid-template-columns: repeat(auto-fit, minmax(110px,1fr)); gap:10px; }
+  .kpi { background:#11141a; border:1px solid var(--line); border-radius:8px; padding:10px; }
+  .kpi .v { font-size:24px; font-weight:700; } .kpi .l { color:var(--muted); font-size:12px; }
+  .bar { height:8px; background:#0c0e13; border-radius:4px; overflow:hidden; min-width:80px; }
+  .bar i { display:block; height:100%; background:var(--accent); }
+  .bar.good i { background:var(--ok); }
+  img.live { width:100%; border-radius:8px; background:#000; aspect-ratio: 4/3; object-fit: contain; }
+  img.thumb { width:64px; height:40px; object-fit:cover; border-radius:4px; background:#000; vertical-align:middle; }
+  input, select { background:#11141a; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font:inherit; }
+  input[type=file] { padding:4px; }
+  form.row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .now { display:flex; gap:12px; align-items:center; }
+  .now img, .now video { width:160px; height:90px; object-fit:contain; background:#000; border-radius:6px; }
+  .muted { color:var(--muted); } .ok { color:var(--ok);} .bad { color:var(--bad);} .warn { color:var(--warn);}
+  .chart { display:flex; align-items:flex-end; gap:3px; height:120px; border-bottom:1px solid var(--line); padding-bottom:2px; }
+  .chart .col { flex:1; display:flex; flex-direction:column; justify-content:flex-end; height:100%; position:relative; }
+  .chart .col b { display:block; background:#2c3444; border-radius:2px 2px 0 0; }
+  .chart .col b.l { background:var(--ok); }
+  .chart .col span { position:absolute; bottom:-18px; left:0; right:0; text-align:center; font-size:10px; color:var(--muted); }
+  .scroll { overflow:auto; max-height:360px; }
+  details summary { cursor:pointer; color:var(--muted); }
+  .toggle { cursor:pointer; }
+  .err { color:var(--bad); font-size:12px; }
+  tr.catrow { cursor:pointer; } tr.catrow:hover td { background:#1d2130; } tr.catrow.active td { background:#1b2740; }
+  .catlink { color:var(--text); text-decoration:none; } tr.catrow.active .catlink { color:var(--accent); }
+  .chip { display:inline-flex; gap:8px; align-items:center; background:#1b2740; color:var(--accent); border-radius:999px;
+          padding:3px 10px; font-size:12px; margin-left:10px; text-transform:none; letter-spacing:0; }
+  .chip a { color:var(--muted); cursor:pointer; }
+  @media (max-width: 700px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Billboard</h1>
+  <span id="status-pill" class="pill off">stopped</span>
+  <button id="btn-start" class="primary" onclick="playerAction('start')">Start</button>
+  <button id="btn-stop" onclick="playerAction('stop')">Stop</button>
+  <button onclick="playerAction('skip')">Skip</button>
+  <a href="/player" target="_blank"><button>Open player</button></a>
+  <span class="muted" id="live-line" style="margin-left:auto">camera: connecting</span>
+</header>
+
+<main>
+  <section>
+    <h2>Now playing</h2>
+    <div id="now" class="now"><span class="muted">nothing</span></div>
+    <div class="muted" id="pick-info" style="margin-top:8px;font-size:12px"></div>
+  </section>
+
+  <section>
+    <h2>Live camera</h2>
+    <img class="live" id="live" src="/stream" alt="camera">
+    <div class="muted" id="cam-err"></div>
+  </section>
+
+  <section>
+    <h2>Totals</h2>
+    <div class="kpis">
+      <div class="kpi"><div class="v" id="k-plays">0</div><div class="l">ad plays</div></div>
+      <div class="kpi"><div class="v" id="k-viewers">0</div><div class="l">viewers</div></div>
+      <div class="kpi"><div class="v" id="k-lookers">0</div><div class="l">looked</div></div>
+      <div class="kpi"><div class="v" id="k-rate">-</div><div class="l">attention</div></div>
+      <div class="kpi"><div class="v" id="k-today">0</div><div class="l">viewers 24h</div></div>
+    </div>
+    <div style="margin-top:10px"><a href="/api/impressions.csv"><button class="small">Export CSV</button></a>
+      <button class="small danger" onclick="resetStats()">Reset stats</button></div>
+  </section>
+
+  <section class="wide">
+    <h2>Categories</h2>
+    <form class="row" onsubmit="return addCategory(event)">
+      <input id="cat-name" placeholder="New category name" required>
+      <button class="primary">Add category</button>
+    </form>
+    <div class="scroll" style="margin-top:10px">
+    <table>
+      <thead><tr><th>Category</th><th class="num">Ads</th><th class="num">Plays</th><th class="num">Share</th>
+        <th class="num">Viewers</th><th class="num">Looked</th><th>Attention</th><th>Belief</th><th></th></tr></thead>
+      <tbody id="cat-rows"></tbody>
+    </table></div>
+    <div class="muted" style="font-size:12px;margin-top:6px">Click a category to see its ads. Attention = looked / viewers over
+      all time. Belief = the scheduler's current (time-decayed) estimate used to pick the next category.</div>
+  </section>
+
+  <section class="wide">
+    <h2 id="ads">Ads <span id="ad-filter-chip"></span></h2>
+    <form class="row" id="upload-form" onsubmit="return uploadAd(event)">
+      <input type="file" id="ad-file" accept="image/*,video/*" required>
+      <input id="ad-name" placeholder="Name (optional)">
+      <select id="ad-cat" required></select>
+      <input id="ad-duration" type="number" min="1" step="0.5" placeholder="Seconds (image)" style="width:130px">
+      <button class="primary" id="upload-btn">Upload</button>
+      <span id="upload-msg" class="muted"></span>
+    </form>
+    <div class="scroll" style="margin-top:10px">
+    <table>
+      <thead><tr><th></th><th>Name</th><th>Category</th><th>Type</th><th class="num">Sec</th><th>Hours</th>
+        <th class="num">Plays</th><th class="num">Viewers</th><th class="num">Looked</th><th>Attention</th>
+        <th>Last played</th><th>On</th><th></th></tr></thead>
+      <tbody id="ad-rows"></tbody>
+    </table></div>
+  </section>
+
+  <section class="wide">
+    <h2>Viewers per hour (last 24 h) <span class="muted" style="text-transform:none;letter-spacing:0">grey = viewers, green = looked</span></h2>
+    <div class="chart" id="hourly"></div>
+  </section>
+
+  <section class="wide">
+    <h2>Recent plays</h2>
+    <div class="scroll">
+    <table>
+      <thead><tr><th>When</th><th>Category</th><th>Ad</th><th class="num">Sec</th><th class="num">Viewers</th>
+        <th class="num">Looked</th><th class="num">Max in view</th><th>End</th></tr></thead>
+      <tbody id="recent-rows"></tbody>
+    </table></div>
+  </section>
+
+  <section class="wide">
+    <details>
+      <summary>Settings</summary>
+      <form class="row" style="margin-top:10px" onsubmit="return saveSettings(event)">
+        <label>Image duration (s) <input name="default_duration" type="number" step="0.5" min="1" style="width:80px"></label>
+        <label>Half-life (h) <input name="half_life_hours" type="number" step="0.5" min="0.1" style="width:80px"></label>
+        <label>Explore % <input name="epsilon_pct" type="number" step="1" min="0" max="100" style="width:70px"></label>
+        <label>Viewer min (s) <input name="min_present_s" type="number" step="0.1" min="0" style="width:70px"></label>
+        <label>Look min (s) <input name="min_look_s" type="number" step="0.1" min="0" style="width:70px"></label>
+        <label>Attention angle (deg) <input name="attention_angle" type="number" step="1" min="5" max="90" style="width:70px"></label>
+        <button class="primary">Save</button>
+      </form>
+      <p class="muted" style="font-size:12px">Half-life: how fast old audience evidence fades. Explore %: chance of
+        playing a random category so none starves. Viewer/Look min: how long a person must be present / facing
+        the screen to count.</p>
+    </details>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let categories = [], lastSeq = null, adFilter = null;
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+const pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '-';
+const fmtTime = (t) => t ? new Date(t * 1000).toLocaleTimeString() : '-';
+const bar = (v, good) => `<div class="bar ${good ? 'good' : ''}"><i style="width:${Math.round(100 * (v || 0))}%"></i></div>`;
+
+async function playerAction(a) { await api('/api/player/' + a, {method: 'POST'}); refreshStatus(); }
+
+async function refreshStatus() {
+  try {
+    const s = await api('/api/status');
+    $('status-pill').className = 'pill ' + (s.running ? 'on' : 'off');
+    $('status-pill').textContent = s.running ? 'running' : 'stopped';
+    const l = s.live || {};
+    $('live-line').innerHTML = l.ok
+      ? `camera: <b>${l.people}</b> people, <b class="ok">${l.looking}</b> looking, ${l.fps} fps`
+      : `camera: <span class="bad">${l.error || 'starting'}</span>`;
+    const c = s.current;
+    if (c) {
+      const live = c.live || {};
+      if (c.seq !== lastSeq) {
+        lastSeq = c.seq;
+        const media = c.ad.type === 'image' ? `<img src="${c.ad.url}">` : `<video src="${c.ad.url}" muted autoplay loop></video>`;
+        $('now').innerHTML = `${media}<div><b>${esc(c.ad.name)}</b><div class="muted">${esc(c.ad.category)}</div>
+          <div id="now-meta"></div></div>`;
+      }
+      $('now-meta').innerHTML = `${c.remaining}s left · viewers so far <b>${live.viewers ?? 0}</b>, looked <b class="ok">${live.lookers ?? 0}</b>`;
+    } else {
+      lastSeq = null;
+      $('now').innerHTML = `<span class="muted">${s.running ? (s.pick_info || 'no ads to play') : 'nothing (stopped)'}</span>`;
+    }
+    $('pick-info').textContent = s.pick_info ? 'last pick: ' + s.pick_info : '';
+  } catch (e) { $('live-line').textContent = 'server unreachable'; }
+}
+
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function refreshCategories() {
+  categories = await api('/api/categories');
+  const sel = $('ad-cat');
+  const cur = sel.value;
+  sel.innerHTML = categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  if (cur) sel.value = cur;
+}
+
+async function refreshStats() {
+  const s = await api('/api/stats');
+  const t = s.totals;
+  $('k-plays').textContent = t.plays; $('k-viewers').textContent = t.viewers; $('k-lookers').textContent = t.lookers;
+  $('k-rate').textContent = pct(t.lookers, t.viewers); $('k-today').textContent = s.last24h.viewers;
+  $('cat-rows').innerHTML = s.categories.map(c => `<tr class="catrow ${adFilter === c.id ? 'active' : ''}" onclick="filterCategory(${c.id})">
+    <td><a class="catlink" href="#ads" onclick="event.preventDefault()"><b>${esc(c.name)}</b></a></td><td class="num">${(categories.find(x => x.id === c.id) || {}).ads ?? ''}</td>
+    <td class="num">${c.plays}</td><td class="num">${pct(c.share, 1)}</td><td class="num">${c.viewers}</td><td class="num">${c.lookers}</td>
+    <td>${bar(c.attention, true)} <span class="muted">${c.attention == null ? '-' : Math.round(c.attention * 100) + '%'}</span></td>
+    <td>${bar(c.belief)} <span class="muted">${c.belief == null ? '-' : Math.round(c.belief * 100) + '%'}</span></td>
+    <td><button class="small danger" onclick="event.stopPropagation(); delCategory(${c.id}, '${esc(c.name)}')">delete</button></td></tr>`).join('')
+    || '<tr><td colspan="9" class="muted">no categories yet</td></tr>';
+  const maxV = Math.max(1, ...s.hourly.map(h => h.viewers || 0));
+  const byHour = Object.fromEntries(s.hourly.map(h => [h.hour, h]));
+  const nowH = new Date().getHours();
+  let cols = '';
+  for (let i = 23; i >= 0; i--) {
+    const h = ((nowH - i) % 24 + 24) % 24, key = String(h).padStart(2, '0'), d = byHour[key] || {viewers: 0, lookers: 0, plays: 0};
+    cols += `<div class="col" title="${key}:00 - ${d.plays} plays, ${d.viewers} viewers, ${d.lookers} looked">
+      <b style="height:${100 * (d.viewers || 0) / maxV}%"></b><b class="l" style="height:${100 * (d.lookers || 0) / maxV}%;margin-top:-${100 * (d.lookers || 0) / maxV}%"></b><span>${key}</span></div>`;
+  }
+  $('hourly').innerHTML = cols;
+  $('recent-rows').innerHTML = s.recent.map(r => `<tr><td>${fmtTime(r.ended_at)}</td><td>${esc(r.category_name)}</td>
+    <td>${esc(r.ad_name)}</td><td class="num">${Math.round(r.ended_at - r.started_at)}</td><td class="num">${r.viewers}</td>
+    <td class="num">${r.lookers}</td><td class="num">${r.max_people}</td><td class="muted">${r.reason}</td></tr>`).join('')
+    || '<tr><td colspan="8" class="muted">no plays yet</td></tr>';
+}
+
+async function refreshAds() {
+  let ads = await api('/api/ads');
+  if (adFilter !== null) {
+    ads = ads.filter(a => a.category_id === adFilter);
+    const cat = categories.find(c => c.id === adFilter);
+    $('ad-filter-chip').innerHTML = `<span class="chip">${esc(cat ? cat.name : '')} · ${ads.length} ad${ads.length === 1 ? '' : 's'} <a onclick="filterCategory(null)">show all</a></span>`;
+  } else {
+    $('ad-filter-chip').innerHTML = '';
+  }
+  $('ad-rows').innerHTML = ads.map(a => `<tr>
+    <td><img class="thumb" src="/thumbs/${a.id}.jpg" onerror="this.style.visibility='hidden'"></td>
+    <td><b>${esc(a.name)}</b></td><td>${esc(a.category_name)}</td><td class="muted">${a.type}</td>
+    <td class="num">${a.duration}</td>
+    <td class="muted"><span class="toggle" title="active hours (click to edit)" onclick="editHours(${a.id},${a.active_from},${a.active_to})">${a.active_from}-${a.active_to}</span></td>
+    <td class="num">${a.plays}</td><td class="num">${a.viewers}</td><td class="num">${a.lookers}</td>
+    <td>${bar(a.viewers ? a.lookers / a.viewers : 0, true)} <span class="muted">${pct(a.lookers, a.viewers)}</span></td>
+    <td class="muted">${fmtTime(a.last_played)}</td>
+    <td><input type="checkbox" ${a.enabled ? 'checked' : ''} onchange="patchAd(${a.id}, {enabled: this.checked ? 1 : 0})"></td>
+    <td><button class="small" onclick="editDuration(${a.id}, ${a.duration})">sec</button>
+        <button class="small danger" onclick="delAd(${a.id}, '${esc(a.name)}')">delete</button></td></tr>`).join('')
+    || `<tr><td colspan="13" class="muted">${adFilter !== null ? 'no ads in this category yet - upload one above' : 'no ads yet - upload one above'}</td></tr>`;
+}
+
+function filterCategory(id) {
+  adFilter = (id === null || adFilter === id) ? null : id;
+  if (adFilter !== null) { $('ad-cat').value = adFilter; document.getElementById('ads').scrollIntoView({behavior: 'smooth', block: 'start'}); }
+  refreshAds(); refreshStats();
+}
+
+async function addCategory(e) {
+  e.preventDefault();
+  try { await api('/api/categories', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: $('cat-name').value})});
+    $('cat-name').value = ''; await refreshCategories(); refreshStats(); }
+  catch (err) { alert(err.message); }
+  return false;
+}
+async function delCategory(id, name) {
+  if (!confirm(`Delete category "${name}" and all its ads?`)) return;
+  await api('/api/categories/' + id, {method: 'DELETE'}); await refreshCategories(); refreshAds(); refreshStats();
+}
+async function uploadAd(e) {
+  e.preventDefault();
+  const fd = new FormData();
+  fd.append('file', $('ad-file').files[0]); fd.append('name', $('ad-name').value);
+  fd.append('category_id', $('ad-cat').value); fd.append('duration', $('ad-duration').value);
+  $('upload-btn').disabled = true; $('upload-msg').textContent = 'uploading...';
+  try { await api('/api/ads', {method: 'POST', body: fd}); $('upload-msg').textContent = 'uploaded';
+    $('ad-file').value = ''; $('ad-name').value = ''; $('ad-duration').value = ''; refreshAds(); refreshCategories(); }
+  catch (err) { $('upload-msg').innerHTML = `<span class="err">${esc(err.message)}</span>`; }
+  $('upload-btn').disabled = false;
+  return false;
+}
+async function patchAd(id, data) {
+  await api('/api/ads/' + id, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+  refreshAds();
+}
+function editDuration(id, cur) { const v = prompt('Seconds on screen', cur); if (v) patchAd(id, {duration: parseFloat(v)}); }
+function editHours(id, f, t) {
+  const v = prompt('Active hours as from-to (24h clock, e.g. 8-18; 0-24 = always)', `${f}-${t}`);
+  if (!v) return; const m = v.match(/^\s*(\d{1,2})\s*-\s*(\d{1,2})\s*$/); if (!m) return alert('format: from-to');
+  patchAd(id, {active_from: +m[1], active_to: +m[2]});
+}
+async function delAd(id, name) { if (!confirm(`Delete ad "${name}"?`)) return; await api('/api/ads/' + id, {method: 'DELETE'}); refreshAds(); refreshCategories(); }
+async function resetStats() { if (!confirm('Delete all play statistics?')) return; await api('/api/stats/reset', {method: 'POST'}); refreshStats(); refreshAds(); }
+
+async function loadSettings() {
+  const s = await api('/api/settings');
+  const f = document.querySelector('details form');
+  for (const el of f.elements) {
+    if (el.name === 'epsilon_pct') el.value = Math.round(parseFloat(s.epsilon) * 100);
+    else if (el.name && s[el.name] !== undefined) el.value = s[el.name];
+  }
+}
+async function saveSettings(e) {
+  e.preventDefault();
+  const data = {};
+  for (const el of e.target.elements) {
+    if (!el.name) continue;
+    if (el.name === 'epsilon_pct') data.epsilon = (parseFloat(el.value) / 100).toString(); else data[el.name] = el.value;
+  }
+  await api('/api/settings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+  refreshStats();
+  return false;
+}
+
+(async () => {
+  await refreshCategories(); refreshAds(); refreshStats(); refreshStatus(); loadSettings();
+  setInterval(refreshStatus, 1000);
+  setInterval(() => { refreshStats(); refreshAds(); }, 5000);
+})();
+</script>
+</body>
+</html>

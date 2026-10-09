@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Billboard player</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; cursor: none; }
+  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  #stage img, #stage video { max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; }
+  #idle { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+          color: #444; font: 28px system-ui, sans-serif; flex-direction: column; gap: 12px; }
+  #idle small { font-size: 14px; color: #333; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="idle"><div>Billboard idle</div><small id="idle-msg">press Start in the dashboard</small></div>
+<script>
+let seq = -1;
+const stage = document.getElementById('stage');
+const idle = document.getElementById('idle');
+const idleMsg = document.getElementById('idle-msg');
+
+function show(cur) {
+  stage.innerHTML = '';
+  const ad = cur.ad;
+  if (ad.type === 'image') {
+    const img = document.createElement('img');
+    img.src = ad.url;
+    stage.appendChild(img);
+  } else {
+    const v = document.createElement('video');
+    v.src = ad.url;
+    v.autoplay = true; v.playsInline = true; v.loop = true;
+    v.muted = false;
+    stage.appendChild(v);
+    v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
+  }
+}
+
+async function tick() {
+  try {
+    const r = await fetch('/api/status', {cache: 'no-store'});
+    const s = await r.json();
+    if (s.running && s.current) {
+      idle.style.display = 'none';
+      if (s.current.seq !== seq) { seq = s.current.seq; show(s.current); }
+    } else {
+      seq = -1; stage.innerHTML = '';
+      idleMsg.textContent = s.running ? (s.pick_info || 'no ads to play') : 'press Start in the dashboard';
+      idle.style.display = 'flex';
+    }
+  } catch (e) {
+    idleMsg.textContent = 'server unreachable';
+    idle.style.display = 'flex';
+  }
+}
+setInterval(tick, 500);
+tick();
+</script>
+</body>
+</html>

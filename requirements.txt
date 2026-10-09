@@ -1,0 +1,7 @@
+numpy
+opencv-python-headless>=4.8
+flask>=3.0
+# person detector runtime (optional; use --faces-only without it)
+tflite-runtime; platform_machine == "aarch64" and python_version < "3.12"
+ai-edge-litert; platform_machine != "aarch64" or python_version >= "3.12"
+# Pi CSI camera: sudo apt install python3-picamera2 (venv created with --system-site-packages)

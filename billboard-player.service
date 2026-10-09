@@ -1,0 +1,19 @@
+# Runs Chromium kiosk on the Pi desktop session. Requires auto-login to desktop.
+# sudo cp billboard-player.service /etc/systemd/system/ && sudo systemctl daemon-reload
+# sudo systemctl enable --now billboard-player
+[Unit]
+Description=pi-billboard fullscreen player
+After=graphical.target billboard-server.service
+Wants=billboard-server.service
+
+[Service]
+User=pi
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+WorkingDirectory=/home/pi/pi-billboard
+ExecStart=/home/pi/pi-billboard/start_player.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target

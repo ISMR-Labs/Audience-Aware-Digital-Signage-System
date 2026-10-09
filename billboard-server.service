@@ -1,0 +1,15 @@
+# sudo cp billboard-server.service /etc/systemd/system/ && sudo systemctl daemon-reload
+# sudo systemctl enable --now billboard-server
+[Unit]
+Description=pi-billboard server (dashboard + audience camera + scheduler)
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/pi-billboard
+ExecStart=/home/pi/pi-billboard/.venv/bin/python server.py --source picam --port 8090
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
