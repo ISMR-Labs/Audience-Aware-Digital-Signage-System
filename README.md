@@ -72,7 +72,7 @@ Smart TV browser.
 64-bit Raspberry Pi OS with desktop (Bookworm or newer), Pi 4 or 5.
 
 ```bash
-scp -r pi-billboard pi@<pi>:~/        # or git clone
+git clone https://github.com/ISMR-Labs/Audience-Aware-Digital-Signage-System.git ~/pi-billboard
 ssh pi@<pi>
 cd ~/pi-billboard && ./install_pi.sh
 ```
