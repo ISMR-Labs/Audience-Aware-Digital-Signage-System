@@ -1,4 +1,4 @@
-# pi-billboard
+# Audience-Aware Digital Signage System (pi-billboard)
 
 Audience-aware digital signage for a Raspberry Pi. Upload ads into
 categories from a web dashboard, press Start, and the Pi's screen plays them
